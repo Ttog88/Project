@@ -1,78 +1,44 @@
-# Claude Code Playbook Template
+# Apartment Airflow Optimizer
 
-[![Claude Hunt](https://img.shields.io/badge/Claude_Hunt-강의-000000)](https://www.claude-hunt.com)
-[![Docs](https://img.shields.io/badge/docs-claude--hunt-2563eb)](https://docs.claude-hunt.com)
+가상 아파트 평면도에서 가구 배치, 창문 개방률, 풍향·풍속을 바꿔 가며 실내 기류와 환기 취약 후보 구역을 보고, 창문 개방 조합을 자동으로 비교하는 **교육용 웹앱**입니다(교육 과제 프로토타입).
 
-> [Claude Hunt](https://www.claude-hunt.com) 강의용 Next.js 16 + React 19 템플릿.
-> 사용법과 워크플로우 문서는 [docs.claude-hunt.com](https://docs.claude-hunt.com)에서 확인하세요.
+> **교육용 상대 비교입니다.** 2D 경량 유체 계산(Stable Fluids)으로 조건 사이의 상대적 경향만 보여 줍니다. 실제 아파트의 환기 성능을 검증하거나 보증한 결과가 아니며, CFD 수준의 정량 정확도는 검증하지 않았습니다.
+
+## 주요 기능
+
+- 가상 아파트 평면도(벽·방문·창문 2개)와 가구 이동·크기 변경·추가·삭제(겹침 방지)
+- 창문별 개방률 0~100%(5% 단위). 설정한 값과 격자에 실제 적용된 값(열린 칸 수·폭)을 구분해 표시
+- 풍향(바람이 불어오는 방향)·풍속 설정, 나침반과 북쪽 화살표
+- 계산된 속도장을 따라 움직이는 입자와, 추적 물질(Passive Scalar) 잔류율 기반 환기 취약 후보 지도
+- 창문 개방 조합 자동 탐색: 기본은 0·25·50·75·100% 5단계 전체 조합이며, 조합이 많으면 단계를 줄이거나 탐색할 창을 고르는 제한 평가로 전환합니다. 결과는 전체 평가와 제한 평가를 구분해 표시합니다.
+- 모든 계산은 브라우저 안에서 수행하며, 입력이나 결과를 외부로 전송하지 않습니다.
+
+## 현재 범위와 한계
+
+- 화면에서 다루는 창문은 2개입니다. 계산 모델과 자동 탐색은 창 2~6개를 처리하도록 일반화되어 있지만, 창문 위치 이동·크기 변경·추가·삭제 UI는 구현하지 않았습니다.
+- 평면도 이미지 업로드, 기상청 CSV 불러오기, 지역·건물 방향 설정은 구현하지 않았습니다.
+- 유출 창이 여럿일 때 창별 유량 분배와 유입·유출 유량의 균형(최대 약 8% 차이)은 정량 검증하지 않은 한계입니다.
+- 자동 탐색은 25% 간격 격자 안의 비교이며, 5% 단위의 모든 값을 확인한 것은 아닙니다.
 
 ## 기술 스택
 
-Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · shadcn/ui · Bun · Vitest · Playwright
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Vitest · Playwright · Bun
 
-## 시작하기
+## 실행
 
 ```bash
 bun install
-bun dev
+bun dev          # http://localhost:3000
+bun run build    # 프로덕션 빌드
+bun run test     # 단위·컴포넌트 테스트
+bun run test:e2e # E2E 테스트(Playwright 브라우저 필요)
 ```
 
-[http://localhost:3000](http://localhost:3000)에서 결과를 확인할 수 있습니다.
+## 문서
 
-## 스크립트
+- 제품 정의: [`PRODUCT.md`](PRODUCT.md)
+- 구현 스펙: [`docs/specs/apartment-airflow-optimizer/spec.md`](docs/specs/apartment-airflow-optimizer/spec.md)
 
-| 명령어 | 설명 |
-|---|---|
-| `bun dev` | 개발 서버 실행 |
-| `bun run build` | 프로덕션 빌드 |
-| `bun start` | 프로덕션 서버 실행 |
-| `bun run lint` | ESLint 실행 |
-| `bun run typecheck` | `tsc --noEmit` 타입 검사 |
-| `bun run test` | Vitest 단위/컴포넌트 테스트 1회 실행 |
-| `bun run test:watch` | Vitest watch 모드 |
-| `bun run test:e2e` | Playwright E2E 테스트 실행 |
+## 라이선스와 서드파티 고지
 
-## 테스트
-
-- **단위·컴포넌트**: Vitest + Testing Library. 설정은 `vitest.config.mts`, 매처와 cleanup은 `vitest.setup.ts`에 있습니다. 테스트 파일은 소스 옆에 `*.test.ts(x)`로 둡니다(`app/page.test.tsx`, `lib/utils.test.ts` 참고). `globals`를 켜지 않았으므로 `describe`/`it`/`expect`는 `vitest`에서 import 합니다.
-- **E2E**: Playwright. 설정은 `playwright.config.ts`, 테스트는 `e2e/*.spec.ts`에 둡니다. `webServer`가 `bun run dev`를 자동으로 띄우므로 별도 서버 실행이 필요 없습니다.
-
-E2E를 처음 실행하기 전에 브라우저를 한 번 내려받아야 합니다.
-
-```bash
-bunx playwright install chromium
-```
-
-브라우저가 이미 설치된 환경(예: Claude Code 원격 세션)에서는 내려받는 대신 실행 파일 경로를 지정할 수 있습니다.
-
-```bash
-PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium bun run test:e2e
-```
-
-`async` Server Component는 Vitest가 아직 지원하지 않으므로 E2E로 검증합니다.
-
-- **런타임 검증(에이전트용)**: [agent-browser](https://github.com/vercel-labs/agent-browser). 에이전트가 `next-dev-loop` 스킬로 실행 중인 앱을 직접 조작해 변경을 확인할 때 씁니다. 프로젝트 의존성이 아니므로 한 번 전역으로 설치합니다.
-
-```bash
-npm i -g agent-browser
-agent-browser install  # 설치된 Chrome이 없을 때만
-```
-
-## Claude Code 워크플로우
-
-```mermaid
-flowchart LR
-    DP["define-product"] --> PRODUCT[/"PRODUCT.md"/]
-    PRODUCT --> SI["shape-idea"]
-    SI --> SPEC[/"docs/specs/&lt;slug&gt;/spec.md"/]
-    SPEC --> ST["split-into-tasks<br/>여러 결과로 나눌 때"]
-    SPEC --> IMP["implement"]
-    ST --> IMP
-    IMP --> HR["human-review<br/>중대한 결과를 검토할 때"]
-    IMP --> PR["pr"]
-    HR --> PR
-    FU[/"docs/follow-ups/*.md"/] --> RF["resolve-follow-ups"]
-    RF --> PR
-```
-
-파이프라인 밖에서는 `project-knowledge`, `maintain-project-context`, `add-stack-context`, `build-prototype`, `explain-visually`, `tdd`가 각자의 조건에 따라 켜집니다. `project-knowledge`는 `GLOSSARY.md`, `docs/decisions/`, `docs/follow-ups/`에 다음 작업에서도 재사용할 지식과 후속 항목을 남깁니다. Git 작업은 `commit`, `pull`, `push`, `pr`, `merge`가 해당 요청에 맞춰 처리합니다.
+이 프로젝트 자체의 라이선스는 아직 정하지 않았습니다. 저장소에 포함된 외부 에이전트 스킬(`.claude/skills/`, `.agents/skills/`)의 출처와 MIT License 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 있습니다.
