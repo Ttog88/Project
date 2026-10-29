@@ -224,7 +224,11 @@ export function AirflowWorkbench() {
               <div>
                 <dt className="text-xs text-muted-foreground">공기 흐름</dt>
                 <dd className="font-medium" data-testid="flow-direction">
-                  {flow?.inletId ? `창 ${flow.inletId} → 창 ${flow.outletId}` : result ? "통과 흐름 없음" : "계산 중"}
+                  {flow?.inletIds.length
+                    ? `창 ${flow.inletIds.join(", ")} → 창 ${flow.outletIds.join(", ")}`
+                    : result
+                      ? "통과 흐름 없음"
+                      : "계산 중"}
                 </dd>
               </div>
               <div>

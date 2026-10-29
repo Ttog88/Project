@@ -21,7 +21,14 @@ export type Cell = { x: number; y: number };
 
 export type RasterOpening = {
   id: WindowDef["id"];
+  label: string;
   side: WindowSide;
+  /** 외벽을 따라 창이 시작하는 칸 */
+  start: number;
+  /** 100% 개방 시 창의 길이(칸) */
+  lengthCells: number;
+  /** 사용자가 설정한 개방률(0~1) */
+  openness: number;
   outwardNormal: { east: number; north: number };
   /** 벽을 뚫은 개구부 셀(바깥쪽 끝 셀 포함). 닫혀 있으면 비어 있다. */
   cells: Cell[];
@@ -72,12 +79,17 @@ export function rasterize(layout: Layout, openness: WindowOpenness): RasterPlan 
   for (const f of layout.furniture) fill(solid, f);
 
   const openings: RasterOpening[] = layout.windows.map((def) => {
-    const widthCells = openCellsFor(def.length, openness[def.id]);
+    const setting = openness[def.id] ?? 0;
+    const widthCells = openCellsFor(def.length, setting);
     const { cells, outerCells } = openingCells(def, widthCells);
     for (const c of cells) solid[c.y * GRID.nx + c.x] = 0;
     return {
       id: def.id,
+      label: def.label,
       side: def.side,
+      start: def.start,
+      lengthCells: def.length,
+      openness: setting,
       outwardNormal: OUTWARD_NORMAL[def.side],
       cells,
       outerCells,

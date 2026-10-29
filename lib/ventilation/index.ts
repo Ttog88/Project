@@ -11,10 +11,15 @@ export {
   type VentilationResult,
 } from "./simulate";
 export {
+  appliedWindowFluxes,
+  buildFlowSetup,
   windFromVector,
   windPressure,
   windTravelVector,
   type CompassVector,
   type FlowSummary,
   type WindConditions,
+  type WindSetup,
+  type WindowFlow,
+  type WindowRole,
 } from "./wind";

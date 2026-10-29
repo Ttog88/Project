@@ -8,7 +8,8 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Furniture = Rect & { id: string; label: string };
 
-export type WindowId = "A" | "B";
+/** 창 ID. 창이 몇 개든 고유한 문자열이면 된다(예: "A", "B", "W3"). */
+export type WindowId = string;
 export type WindowSide = "north" | "south" | "east" | "west";
 
 export type WindowDef = {

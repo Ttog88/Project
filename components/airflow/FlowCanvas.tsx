@@ -136,7 +136,7 @@ function drawScene(
     }
     // 이름표와 흐름 방향
     const role =
-      result?.flow.inletId === win.id ? " 유입" : result?.flow.outletId === win.id ? " 유출" : "";
+      result?.flow.inletIds.includes(win.id) ? " 유입" : result?.flow.outletIds.includes(win.id) ? " 유출" : "";
     ctx.font = "600 11px sans-serif";
     ctx.fillStyle = "#0369a1";
     ctx.textAlign = "center";

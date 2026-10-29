@@ -5,7 +5,7 @@ import {
   type WindowOpenness,
 } from "@/lib/floorplan";
 import { FlowSimulation, type VelocityField } from "@/lib/flow";
-import { buildFlowSetup, type FlowSummary, type WindConditions } from "./wind";
+import { appliedWindowFluxes, buildFlowSetup, type FlowSummary, type WindConditions } from "./wind";
 
 /** 모든 조합에 같은 계산 시간과 시간 간격을 쓴다. */
 export const SIMULATION = { dt: 0.2, seconds: 60 } as const;
@@ -65,13 +65,19 @@ function prepare(layout: Layout, conditions: Conditions): Prepared {
     finish: () => {
       const snap = sim.snapshot();
       const { weak, share } = findWeakZones(snap.tracer, setup.tracked);
+      // 창별로 모델 유량과 Solver 결과에서 측정한 적용 유량을 함께 담는다.
+      const applied = appliedWindowFluxes(plan.openings, sim.faceVelocities(), plan.nx);
+      const flow: FlowSummary = {
+        ...summary,
+        windows: summary.windows.map((w) => ({ ...w, appliedFlux: applied[w.id] ?? 0 })),
+      };
       return {
         conditions,
         residual: snap.residual,
         weak,
         weakShare: share,
         tracer: snap.tracer,
-        flow: summary,
+        flow,
         field: {
           nx: snap.nx,
           ny: snap.ny,
@@ -165,12 +171,19 @@ export async function searchWindowCombinations(
   }
 
   const openSum = (o: WindowOpenness) => Object.values(o).reduce<number>((s, v) => s + v, 0);
+  // 잔류율과 열린 정도의 합이 같으면 창 순서(레이아웃에 놓인 순서)대로 개방률이 작은 쪽을 먼저 둔다.
+  const byWindowOrder = (a: WindowOpenness, b: WindowOpenness) => {
+    for (const id of ids) {
+      const diff = a[id] - b[id];
+      if (diff) return diff;
+    }
+    return 0;
+  };
   const sorted = [...results].sort(
     (a, b) =>
       a.result.residual - b.result.residual ||
       openSum(a.windowOpenness) - openSum(b.windowOpenness) ||
-      a.windowOpenness.A - b.windowOpenness.A ||
-      a.windowOpenness.B - b.windowOpenness.B
+      byWindowOrder(a.windowOpenness, b.windowOpenness)
   );
   const entries = sorted.map((r, i) => ({ ...r, rank: i + 1 }));
   let current = entries.find((e) => same(e.windowOpenness));
