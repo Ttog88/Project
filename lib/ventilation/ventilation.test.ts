@@ -11,6 +11,9 @@ import {
   type Conditions,
 } from "@/lib/ventilation";
 
+/** 이전 기본 탐색(0·50·100% 3단계, 창 2개 9조합). 기존 회귀 테스트가 이 단계를 그대로 쓴다. */
+const THREE_LEVELS = [0, 0.5, 1];
+
 const westWind = (a: 0 | 0.5 | 1, b: 0 | 0.5 | 1, speed = 3): Conditions => ({
   windDirectionDeg: 270,
   windSpeed: speed,
@@ -94,6 +97,7 @@ describe("창문 개방 조합 탐색", () => {
   test("9개 조합을 모두 계산해 잔류율이 낮은 순으로 정렬하고 상위 3개를 고른다", async () => {
     const progress: number[] = [];
     const outcome = await searchWindowCombinations(layout, westWind(0.5, 0), {
+      levels: THREE_LEVELS,
       onProgress: (done) => progress.push(done),
     });
     expect(outcome).not.toBeNull();
@@ -110,7 +114,7 @@ describe("창문 개방 조합 탐색", () => {
   }, 60_000);
 
   test("두 창을 모두 닫은 조합은 잔류율이 가장 높다(통과 흐름이 없는 조합과 동률)", async () => {
-    const outcome = await searchWindowCombinations(layout, westWind(1, 1));
+    const outcome = await searchWindowCombinations(layout, westWind(1, 1), { levels: THREE_LEVELS });
     const closed = outcome!.entries.find((e) => e.windowOpenness.A === 0 && e.windowOpenness.B === 0)!;
     const highest = Math.max(...outcome!.entries.map((e) => e.result.residual));
     expect(closed.result.residual).toBeCloseTo(1, 6);
@@ -123,7 +127,7 @@ describe("창문 개방 조합 탐색", () => {
 
   test("같은 입력으로 두 번 탐색하면 같은 순위와 잔류율이 나온다", async () => {
     const run = async () =>
-      (await searchWindowCombinations(layout, westWind(1, 0.5)))!.entries.map((e) => [
+      (await searchWindowCombinations(layout, westWind(1, 0.5), { levels: THREE_LEVELS }))!.entries.map((e) => [
         e.windowOpenness,
         e.result.residual,
       ]);
@@ -211,7 +215,7 @@ describe("풍향 기준(바람이 불어오는 방향)", () => {
     for (const [a, b, residual] of golden) {
       expect(simulateVentilation(layout, westWind(a, b)).residual).toBeCloseTo(residual, 4);
     }
-  });
+  }, 60_000);
 });
 
 describe("가구 삭제와 유동 계산", () => {
@@ -261,7 +265,7 @@ describe("5% 단위 개방률과 격자 적용", () => {
   });
 
   test("기존 9개 조합 탐색 결과가 그대로이다(서풍 3 m/s)", async () => {
-    const outcome = await searchWindowCombinations(layout, withOpenness(1, 0.5));
+    const outcome = await searchWindowCombinations(layout, withOpenness(1, 0.5), { levels: THREE_LEVELS });
     const entries = outcome!.entries;
     expect(entries).toHaveLength(9);
     expect(outcome!.current.rank).toBe(2);
@@ -282,6 +286,7 @@ describe("5% 단위 개방률과 격자 적용", () => {
   test("현재 개방률이 탐색 단계에 없으면(55%) 현재 조건을 따로 계산해 현재 행으로 쓴다", async () => {
     const progress: [number, number][] = [];
     const outcome = await searchWindowCombinations(layout, withOpenness(0.55, 0.5), {
+      levels: THREE_LEVELS,
       onProgress: (done, total) => progress.push([done, total]),
     });
     expect(outcome).not.toBeNull();

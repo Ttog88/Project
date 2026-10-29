@@ -27,6 +27,9 @@ test("가구와 창문을 바꾸고 자동 탐색해 추천 조건을 현재 조
   // 자동 탐색: 상위 3개와 현재 조건이 표에 나오고, 나란히 비교할 수 있다
   await page.getByRole("button", { name: "최적 조합 탐색" }).click();
   await expect(page.getByTestId("search-results")).toBeVisible({ timeout: 90_000 });
+  // 기본은 5단계 전체 평가(창 2개 → 25조합, 계산 16개, 계산 생략 9개)이다.
+  await expect(page.getByTestId("search-scope-mode")).toHaveText("전체 평가");
+  await expect(page.getByTestId("search-scope-counts")).toHaveText("평가 25조합 (계산 16 · 계산 생략 9)");
   await expect(page.getByTestId("row-current")).toBeVisible();
   for (const rank of [1, 2, 3]) await expect(page.getByTestId(`row-top-${rank}`)).toBeVisible();
   // 나란히 비교하는 평면도는 2개이고, 각각 북쪽 화살표가 있다.

@@ -308,8 +308,9 @@ describe("기존 2개 창문 결과 회귀", () => {
 
   test("창 ID가 A·B가 아니어도 9개 조합 탐색이 같은 순서와 값을 낸다", async () => {
     const renamed = withWindows(base.windows.map((w, i) => ({ ...w, id: `W${i + 1}` })));
-    const original = await searchWindowCombinations(base, { ...wind(), windowOpenness: { A: 1, B: 0.5 } });
-    const dynamic = await searchWindowCombinations(renamed, { ...wind(), windowOpenness: { W1: 1, W2: 0.5 } });
+    const levels = [0, 0.5, 1];
+    const original = await searchWindowCombinations(base, { ...wind(), windowOpenness: { A: 1, B: 0.5 } }, { levels });
+    const dynamic = await searchWindowCombinations(renamed, { ...wind(), windowOpenness: { W1: 1, W2: 0.5 } }, { levels });
     expect(dynamic!.entries).toHaveLength(9);
     expect(dynamic!.entries.map((e) => [e.windowOpenness.W1, e.windowOpenness.W2, e.result.residual])).toEqual(
       original!.entries.map((e) => [e.windowOpenness.A, e.windowOpenness.B, e.result.residual])

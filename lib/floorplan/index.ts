@@ -20,7 +20,7 @@ export {
   openCellsFor,
   type AppliedOpening,
 } from "./opening";
-export { rasterize } from "./rasterize";
+export { OUTWARD_NORMAL, rasterize } from "./rasterize";
 export type { Cell, RasterPlan, RasterOpening } from "./rasterize";
 export {
   GRID,

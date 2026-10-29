@@ -2,6 +2,7 @@ export {
   MEANINGFUL_DIFFERENCE,
   SIMULATION,
   TOP_COUNT,
+  evaluateWithoutFlow,
   searchWindowCombinations,
   simulateVentilation,
   simulateVentilationAsync,
@@ -23,3 +24,13 @@ export {
   type WindowFlow,
   type WindowRole,
 } from "./wind";
+export {
+  COMPUTE_LIMIT,
+  DEFAULT_SEARCH_LEVELS,
+  MAX_TOTAL_COMBOS,
+  createFlowClassifier,
+  generateCombinations,
+  planWindowCombinations,
+  type SearchBase,
+  type SearchPlan,
+} from "./search-plan";

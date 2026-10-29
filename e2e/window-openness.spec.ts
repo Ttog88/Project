@@ -63,7 +63,7 @@ test("5% 단위로 개방률을 조절하면 설정·적용 값이 구분되어 
   await expect(page.getByTestId("flow-direction")).toHaveText("창 A → 창 B", { timeout: 30_000 });
 });
 
-test("현재 개방률이 55%처럼 탐색 단계에 없어도 자동 탐색이 현재 행과 9개 조합 추천을 보여 준다", async ({ page }) => {
+test("현재 개방률이 55%처럼 탐색 단계에 없어도 자동 탐색이 현재 행과 5단계 25개 조합 추천을 보여 준다", async ({ page }) => {
   await page.goto("/");
   await settled(page);
   await setOpenness(page, "A", 55);
@@ -74,4 +74,5 @@ test("현재 개방률이 55%처럼 탐색 단계에 없어도 자동 탐색이 
   await expect(page.getByTestId("row-current")).toContainText("55%");
   for (const rank of [1, 2, 3]) await expect(page.getByTestId(`row-top-${rank}`)).toBeVisible();
   await expect(page.getByTestId("row-top-1")).toContainText("100%100%");
+  await expect(page.getByTestId("search-scope")).toContainText("현재 조건이 탐색 조합에 없어 따로 1회 계산합니다.");
 });

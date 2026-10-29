@@ -10,7 +10,7 @@ import {
 } from "./types";
 
 /** 창이 바깥을 향하는 방향(동쪽, 북쪽이 양수인 지리 좌표). */
-const OUTWARD_NORMAL: Record<WindowSide, { east: number; north: number }> = {
+export const OUTWARD_NORMAL: Record<WindowSide, { east: number; north: number }> = {
   west: { east: -1, north: 0 },
   east: { east: 1, north: 0 },
   north: { east: 0, north: 1 },

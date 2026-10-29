@@ -17,6 +17,7 @@ import {
   type WindowOpenness,
 } from "@/lib/floorplan";
 import {
+  planWindowCombinations,
   searchWindowCombinations,
   simulateVentilationAsync,
   type Conditions,
@@ -105,7 +106,13 @@ export function AirflowWorkbench() {
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null);
   const [outcomeKey, setOutcomeKey] = useState("");
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 9 });
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  // 조합이 너무 많을 때 사용자가 고른 탐색할 창(null이면 모든 창)
+  const [searchWindowIds, setSearchWindowIds] = useState<string[] | null>(null);
+  const searchPlan = useMemo(
+    () => planWindowCombinations(layout, conditions, { windowIds: searchWindowIds ?? undefined }),
+    [layout, conditions, searchWindowIds]
+  );
   const searchToken = useRef({ cancelled: false });
   const inputKey = useMemo(
     () => JSON.stringify({ f: layout.furniture, o: openness, d: direction, s: speed }),
@@ -120,8 +127,9 @@ export function AirflowWorkbench() {
     searchToken.current = token;
     const key = inputKey;
     setRunning(true);
-    setProgress({ done: 0, total: 9 });
+    setProgress({ done: 0, total: searchPlan.totalCombos + (searchPlan.currentOffGrid ? 1 : 0) });
     const found = await searchWindowCombinations(layout, conditions, {
+      windowIds: searchWindowIds ?? undefined,
       signal: token,
       onProgress: (done, total) => setProgress({ done, total }),
     });
@@ -260,6 +268,9 @@ export function AirflowWorkbench() {
 
       <OptimizerPanel
         layout={layout}
+        plan={searchPlan}
+        selectedWindowIds={searchWindowIds}
+        onSelectWindows={setSearchWindowIds}
         outcome={outcome}
         stale={outcome !== null && outcomeKey !== inputKey}
         running={running}

@@ -1,10 +1,15 @@
 import {
-  OPENNESS_LEVELS,
   rasterize,
   type Layout,
   type WindowOpenness,
 } from "@/lib/floorplan";
 import { FlowSimulation, type VelocityField } from "@/lib/flow";
+import {
+  createFlowClassifier,
+  generateCombinations,
+  planWindowCombinations,
+  type SearchPlan,
+} from "./search-plan";
 import { appliedWindowFluxes, buildFlowSetup, type FlowSummary, type WindConditions } from "./wind";
 
 /** 모든 조합에 같은 계산 시간과 시간 간격을 쓴다. */
@@ -98,6 +103,14 @@ export function simulateVentilation(layout: Layout, conditions: Conditions): Ven
   return run.finish();
 }
 
+/**
+ * Solver를 돌리지 않고 결과를 만든다. 통과 흐름이 없는 조건에서는 속도가 0이고 추적 물질이 처음 그대로이므로
+ * simulateVentilation과 같은 결과(잔류율 100%)가 나온다. 계산을 생략하는 조합에 쓴다.
+ */
+export function evaluateWithoutFlow(layout: Layout, conditions: Conditions): VentilationResult {
+  return prepare(layout, conditions).finish();
+}
+
 const yieldToBrowser = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /** 계산 중간에 화면이 멈추지 않도록 일정 스텝마다 제어권을 돌려주는 버전. */
@@ -118,14 +131,23 @@ export async function simulateVentilationAsync(
 export type CombinationEntry = {
   windowOpenness: WindowOpenness;
   result: VentilationResult;
-  /** 잔류율이 낮은 순서의 순위(1부터). 0이면 탐색 단계에 없어 따로 계산한 현재 조건이다. */
+  /** 잔류율이 낮은 순서의 순위(1부터). 0이면 탐색 조합에 없어 따로 계산한 현재 조건이다. */
   rank: number;
+  /** 통과 흐름이 없어 계산을 생략한 조합(잔류율 100%로 정해짐) */
+  skipped: boolean;
 };
 
 export type SearchOutcome = {
   entries: CombinationEntry[];
   top: CombinationEntry[];
   current: CombinationEntry;
+  /** 실제로 쓴 탐색 계획(단계, 탐색한 창, 고정한 창, 조합 수) */
+  plan: SearchPlan;
+  /** 평가한 조합 중 Solver로 계산한 수와 계산을 생략한 수(둘의 합이 평가 조합 수) */
+  computedCount: number;
+  skippedCount: number;
+  /** 현재 조건이 탐색 조합에 없어 따로 계산했는지 */
+  currentComputedSeparately: boolean;
 };
 
 export const TOP_COUNT = 3;
@@ -134,39 +156,61 @@ export const TOP_COUNT = 3;
 export const MEANINGFUL_DIFFERENCE = 0.005;
 
 /**
- * 두 창의 개방률 3단계 조합(기본 9개)을 같은 조건으로 모두 계산해 잔류율이 낮은 순으로 정렬한다.
+ * 창 개방률 조합을 같은 조건으로 모두 평가해 잔류율이 낮은 순으로 정렬한다.
+ * 조합과 단계는 탐색 계획(planWindowCombinations)을 따른다. 기본은 모든 창을 5단계로 탐색하고,
+ * 계산 대상이 많으면 단계를 줄이며, 그래도 많으면 windowIds로 탐색할 창을 골라야 한다.
+ * 통과 흐름이 없는 조합은 계산하지 않아도 결과가 정해지므로 Solver를 돌리지 않는다(평가 조합 수에는 포함).
  * 같은 풍향·풍속·가구·초기 농도·계산 시간을 쓰므로 같은 입력이면 항상 같은 결과가 나온다.
  */
 export async function searchWindowCombinations(
   layout: Layout,
   base: Conditions,
   options: {
+    /** 단계를 직접 정한다(단계를 줄이는 정책을 쓰지 않음). 예: [0, 0.5, 1] */
+    levels?: readonly number[];
+    /** 탐색할 창. 나머지 창은 현재 개방률로 고정한다. */
+    windowIds?: readonly string[];
     onProgress?: (done: number, total: number) => void;
     signal?: { cancelled: boolean };
   } = {}
 ): Promise<SearchOutcome | null> {
+  const plan = planWindowCombinations(layout, base, {
+    levels: options.levels,
+    windowIds: options.windowIds,
+  });
+  if (plan.status !== "ok") {
+    throw new Error("탐색할 조합이 너무 많습니다. 탐색할 창을 선택하세요.");
+  }
   const ids = layout.windows.map((w) => w.id);
-  const combos: WindowOpenness[] = [{ A: 0, B: 0 }];
-  combos.length = 0;
-  const build = (index: number, acc: Partial<WindowOpenness>) => {
-    if (index === ids.length) {
-      combos.push({ ...(acc as WindowOpenness) });
-      return;
-    }
-    for (const level of OPENNESS_LEVELS) build(index + 1, { ...acc, [ids[index]]: level });
-  };
-  build(0, {});
-
+  const classify = createFlowClassifier(layout, base);
+  const combos = generateCombinations(layout, base, plan.searchedIds, plan.levels);
   const same = (o: WindowOpenness) => ids.every((id) => o[id] === base.windowOpenness[id]);
-  // 현재 개방률(5% 단위 수동 설정)이 탐색 단계에 없으면 현재 조건을 따로 한 번 더 계산한다.
+  // 현재 조건이 탐색 조합에 없으면 따로 한 번 더 계산한다.
   const currentOffGrid = !combos.some(same);
   const total = combos.length + (currentOffGrid ? 1 : 0);
 
-  const results: { windowOpenness: WindowOpenness; result: VentilationResult }[] = [];
+  const evaluate = async (windowOpenness: WindowOpenness) => {
+    const conditions = { ...base, windowOpenness };
+    if (!classify(windowOpenness)) {
+      return { result: evaluateWithoutFlow(layout, conditions), skipped: true };
+    }
+    const result = await simulateVentilationAsync(layout, conditions, options.signal);
+    return result ? { result, skipped: false } : null;
+  };
+
+  const results: { windowOpenness: WindowOpenness; result: VentilationResult; skipped: boolean }[] = [];
+  let computed = 0;
+  let skipped = 0;
   for (const windowOpenness of combos) {
-    const result = await simulateVentilationAsync(layout, { ...base, windowOpenness }, options.signal);
-    if (!result) return null;
-    results.push({ windowOpenness, result });
+    const evaluated = await evaluate(windowOpenness);
+    if (!evaluated) return null;
+    if (evaluated.skipped) {
+      skipped++;
+      if (skipped % 25 === 0) await yieldToBrowser();
+    } else {
+      computed++;
+    }
+    results.push({ windowOpenness, ...evaluated });
     options.onProgress?.(results.length, total);
   }
 
@@ -185,13 +229,21 @@ export async function searchWindowCombinations(
       openSum(a.windowOpenness) - openSum(b.windowOpenness) ||
       byWindowOrder(a.windowOpenness, b.windowOpenness)
   );
-  const entries = sorted.map((r, i) => ({ ...r, rank: i + 1 }));
+  const entries: CombinationEntry[] = sorted.map((r, i) => ({ ...r, rank: i + 1 }));
   let current = entries.find((e) => same(e.windowOpenness));
   if (!current) {
-    const result = await simulateVentilationAsync(layout, base, options.signal);
-    if (!result) return null;
-    current = { windowOpenness: base.windowOpenness, result, rank: 0 };
+    const evaluated = await evaluate(base.windowOpenness);
+    if (!evaluated) return null;
+    current = { windowOpenness: base.windowOpenness, ...evaluated, rank: 0 };
     options.onProgress?.(total, total);
   }
-  return { entries, top: entries.slice(0, TOP_COUNT), current };
+  return {
+    entries,
+    top: entries.slice(0, TOP_COUNT),
+    current,
+    plan,
+    computedCount: computed,
+    skippedCount: skipped,
+    currentComputedSeparately: currentOffGrid,
+  };
 }

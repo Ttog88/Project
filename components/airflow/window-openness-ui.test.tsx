@@ -130,6 +130,8 @@ test("현재 개방률이 탐색 단계에 없어도(55%) 자동 탐색이 오�
   const current = screen.getByTestId("row-current");
   expect(current).toHaveTextContent("55%");
   for (const rank of [1, 2, 3]) expect(screen.getByTestId(`row-top-${rank}`)).toBeInTheDocument();
-  // 추천 조합은 기존 0·50·100% 단계 안에서 고른다.
+  // 현재 조건(55%)은 5단계(0·25·50·75·100%)에 없어 따로 계산되고, 추천은 탐색한 5단계 조합 안에서 고른다.
+  expect(screen.getByTestId("search-scope")).toHaveTextContent("현재 조건이 탐색 조합에 없어 따로 1회 계산합니다.");
+  expect(screen.getByTestId("search-scope-counts")).toHaveTextContent("평가 25조합");
   expect(screen.getByTestId("row-top-1")).toHaveTextContent("100%100%");
 }, 120_000);
