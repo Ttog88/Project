@@ -5,12 +5,14 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  FURNITURE_CATALOG,
   FURNITURE_MAX,
   FURNITURE_MIN,
   OPENNESS_LEVELS,
-  placeFurniture,
+  type FurnitureKind,
   type Layout,
   type Openness,
+  type Rect,
   type WindowOpenness,
 } from "@/lib/floorplan";
 
@@ -125,24 +127,30 @@ export function FurniturePanel({
   layout,
   selectedId,
   onSelect,
-  onChange,
+  onEdit,
+  pendingKind,
+  onPendingKind,
+  onAddInEmptySpace,
 }: {
   layout: Layout;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onChange: (layout: Layout) => void;
+  /** 이동·크기 변경 요청(충돌 판정은 호출한 쪽에서 처리) */
+  onEdit: (id: string, rect: Rect) => void;
+  pendingKind: FurnitureKind | null;
+  onPendingKind: (kind: FurnitureKind | null) => void;
+  onAddInEmptySpace: () => void;
 }) {
   const selected = layout.furniture.find((f) => f.id === selectedId) ?? null;
   const meters = (cells: number) => (cells / 6).toFixed(1);
   const apply = (dx: number, dy: number, dw: number, dh: number) => {
     if (!selected) return;
-    const next = placeFurniture(layout, selected.id, {
+    onEdit(selected.id, {
       x: selected.x + dx,
       y: selected.y + dy,
       w: selected.w + dw,
       h: selected.h + dh,
     });
-    if (next !== layout) onChange(next);
   };
 
   return (
@@ -233,6 +241,36 @@ export function FurniturePanel({
         ) : (
           <p className="text-sm text-muted-foreground">가구를 선택하면 크기와 위치를 바꿀 수 있습니다.</p>
         )}
+
+        <div className="flex flex-col gap-2 border-t pt-3" data-testid="add-furniture">
+          <span className="text-sm font-medium">가구 추가</span>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="추가할 가구 종류">
+            {FURNITURE_CATALOG.map((item) => (
+              <Button
+                key={item.kind}
+                size="xs"
+                variant={pendingKind === item.kind ? "default" : "outline"}
+                aria-pressed={pendingKind === item.kind}
+                aria-label={`${item.label} 추가`}
+                onClick={() => onPendingKind(pendingKind === item.kind ? null : item.kind)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+          {pendingKind ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                평면도에서 놓을 위치를 클릭하거나, 아래 버튼으로 빈 공간에 바로 추가하세요.
+              </p>
+              <Button size="sm" variant="secondary" onClick={onAddInEmptySpace}>
+                빈 공간에 추가
+              </Button>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">추가할 가구 종류를 먼저 고르세요.</p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -1,6 +1,9 @@
 // 평면도는 격자 셀 단위로 표현한다. x는 동쪽, y는 남쪽(화면 아래)으로 커진다.
 export const GRID = { nx: 60, ny: 42, cellMeters: 1 / 6 } as const;
 
+/** 외벽 두께(셀). 창 개구부는 이 두께만큼의 통로가 된다. */
+export const WALL_THICKNESS = 2;
+
 export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Furniture = Rect & { id: string; label: string };

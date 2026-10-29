@@ -1,5 +1,6 @@
 import {
   GRID,
+  WALL_THICKNESS,
   type Layout,
   type Rect,
   type WindowDef,
@@ -14,9 +15,6 @@ const OUTWARD_NORMAL: Record<WindowSide, { east: number; north: number }> = {
   north: { east: 0, north: 1 },
   south: { east: 0, north: -1 },
 };
-
-/** 외벽 두께(셀). 창 개구부는 이 두께만큼의 통로가 된다. */
-const WALL_THICKNESS = 2;
 
 export type Cell = { x: number; y: number };
 

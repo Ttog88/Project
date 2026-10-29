@@ -1,5 +1,17 @@
 export { createSampleLayout } from "./sample";
-export { placeFurniture, FURNITURE_MIN, FURNITURE_MAX } from "./furniture";
+export {
+  FURNITURE_CATALOG,
+  FURNITURE_MAX,
+  FURNITURE_MIN,
+  addFurniture,
+  checkPlacement,
+  placeFurniture,
+  type AddFurnitureResult,
+  type FurnitureKind,
+  type PlacementCheck,
+  type PlacementReason,
+  type PlacementResult,
+} from "./furniture";
 export { rasterize } from "./rasterize";
 export type { Cell, RasterPlan, RasterOpening } from "./rasterize";
 export {

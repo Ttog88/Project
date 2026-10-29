@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createSampleLayout, placeFurniture } from "@/lib/floorplan";
+import { addFurniture, createSampleLayout, placeFurniture } from "@/lib/floorplan";
 import {
   MEANINGFUL_DIFFERENCE,
   searchWindowCombinations,
@@ -68,7 +68,7 @@ describe("환기 계산", () => {
   });
 
   test("가구를 바꾸면 결과가 달라진다", () => {
-    const moved = placeFurniture(layout, "table", { x: 26, y: 12, w: 10, h: 12 });
+    const moved = placeFurniture(layout, "table", { x: 26, y: 12, w: 10, h: 12 }).layout;
     const a = simulateVentilation(layout, westWind(1, 1));
     const b = simulateVentilation(moved, westWind(1, 1));
     expect(b.residual).not.toBeCloseTo(a.residual, 4);
@@ -127,4 +127,24 @@ describe("창문 개방 조합 탐색", () => {
       ]);
     expect(await run()).toEqual(await run());
   }, 120_000);
+});
+
+describe("가구 추가와 유동 계산", () => {
+  test("가구를 추가하면 고체 셀 마스크와 유동 결과가 달라진다", () => {
+    const layout = createSampleLayout();
+    const added = addFurniture(layout, "shelf", { x: 30, y: 21 });
+    expect(added.status).toBe("added");
+    const before = simulateVentilation(layout, westWind(1, 1));
+    const after = simulateVentilation(added.layout, westWind(1, 1));
+    const maskDiff = before.field.solid.reduce((n, v, c) => n + (v !== after.field.solid[c] ? 1 : 0), 0);
+    expect(maskDiff).toBe(6 * 12);
+    expect(after.residual).not.toBeCloseTo(before.residual, 4);
+    // 추가된 가구 위에는 유동이 없다.
+    for (let c = 0; c < after.field.solid.length; c++) {
+      if (after.field.solid[c]) {
+        expect(after.field.u[c]).toBe(0);
+        expect(after.field.v[c]).toBe(0);
+      }
+    }
+  });
 });

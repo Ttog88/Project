@@ -6,7 +6,15 @@ import { Info, Wind } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createSampleLayout, type Layout, type WindowOpenness } from "@/lib/floorplan";
+import {
+  addFurniture,
+  createSampleLayout,
+  placeFurniture,
+  type FurnitureKind,
+  type Layout,
+  type Rect,
+  type WindowOpenness,
+} from "@/lib/floorplan";
 import {
   searchWindowCombinations,
   simulateVentilationAsync,
@@ -18,6 +26,7 @@ import {
 import { FurniturePanel, WindControls, WindowControls, directionName } from "./ControlPanels";
 import { FlowCanvas } from "./FlowCanvas";
 import { OptimizerPanel } from "./OptimizerPanel";
+import { placementMessage } from "./placementMessages";
 
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 
@@ -27,6 +36,8 @@ export function AirflowWorkbench() {
   const [direction, setDirection] = useState(270);
   const [speed, setSpeed] = useState(3);
   const [selectedId, setSelectedId] = useState<string | null>("table");
+  const [pendingKind, setPendingKind] = useState<FurnitureKind | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [showParticles, setShowParticles] = useState(true);
   const [showTracer, setShowTracer] = useState(true);
   const [showWeak, setShowWeak] = useState(true);
@@ -35,6 +46,34 @@ export function AirflowWorkbench() {
     () => ({ windowOpenness: openness, windDirectionDeg: direction, windSpeed: speed }),
     [openness, direction, speed]
   );
+
+  // 안내 메시지는 잠시 뒤 사라진다.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  // 이동·크기 변경은 모두 여기서 같은 충돌 판정(placeFurniture)을 거친다.
+  // 거부되면 배치를 바꾸지 않고(마지막 유효 상태 유지) 안내만 띄운다.
+  const editFurniture = (id: string, rect: Rect) => {
+    const result = placeFurniture(layout, id, rect);
+    if (result.status === "moved") setLayout(result.layout);
+    else if (result.status === "rejected") setNotice(placementMessage(result.reason!, "edit"));
+  };
+
+  const addFurnitureOfKind = (at?: { x: number; y: number }) => {
+    if (!pendingKind) return;
+    const result = addFurniture(layout, pendingKind, at);
+    if (result.status === "added") {
+      setLayout(result.layout);
+      setSelectedId(result.furniture.id);
+      setPendingKind(null);
+      setNotice(null);
+    } else {
+      setNotice(placementMessage(result.reason, "add"));
+    }
+  };
 
   // 조건이 바뀌면 잠시 기다렸다가 유동장을 다시 계산한다.
   const [computed, setComputed] = useState<{ result: VentilationResult; layout: Layout } | null>(null);
@@ -122,8 +161,19 @@ export function AirflowWorkbench() {
               showTracer={showTracer}
               showWeak={showWeak}
               ariaLabel="가상 아파트 평면도, 유동 입자, 환기 취약 후보 지도"
-              editor={{ selectedId, onSelect: setSelectedId, onChange: setLayout }}
+              editor={{
+                selectedId,
+                onSelect: setSelectedId,
+                onEdit: editFurniture,
+                placing: pendingKind !== null,
+                onPlaceAt: addFurnitureOfKind,
+              }}
             />
+            {notice ? (
+              <Alert variant="destructive" role="status" data-testid="placement-notice">
+                <AlertDescription className="text-destructive">{notice}</AlertDescription>
+              </Alert>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               {(
                 [
@@ -180,7 +230,15 @@ export function AirflowWorkbench() {
         <div className="flex flex-col gap-4">
           <WindowControls layout={layout} openness={openness} onChange={setOpenness} />
           <WindControls direction={direction} speed={speed} onDirection={setDirection} onSpeed={setSpeed} />
-          <FurniturePanel layout={layout} selectedId={selectedId} onSelect={setSelectedId} onChange={setLayout} />
+          <FurniturePanel
+            layout={layout}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onEdit={editFurniture}
+            pendingKind={pendingKind}
+            onPendingKind={setPendingKind}
+            onAddInEmptySpace={() => addFurnitureOfKind()}
+          />
         </div>
       </div>
 

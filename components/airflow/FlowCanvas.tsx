@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 
 import {
   GRID,
-  placeFurniture,
   rasterize,
   type Layout,
   type Rect,
@@ -21,7 +20,11 @@ const TIME_SCALE = 4;
 type EditorProps = {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onChange: (layout: Layout) => void;
+  /** 이동·크기 변경 요청. 충돌 판정과 반영은 호출한 쪽이 한곳에서 처리한다. */
+  onEdit: (id: string, rect: Rect) => void;
+  /** 새 가구를 놓을 위치를 고르는 중이면 true */
+  placing: boolean;
+  onPlaceAt: (cell: { x: number; y: number }) => void;
 };
 
 type Props = {
@@ -296,10 +299,7 @@ function FurnitureLayer({
     };
   };
 
-  const apply = (id: string, next: Rect) => {
-    const updated = placeFurniture(layout, id, next);
-    if (updated !== layout) editor.onChange(updated);
-  };
+  const apply = (id: string, next: Rect) => editor.onEdit(id, next);
 
   const onMove = (event: React.PointerEvent) => {
     const state = drag.current;
@@ -333,12 +333,14 @@ function FurnitureLayer({
     <svg
       ref={svgRef}
       viewBox={`0 0 ${GRID.nx} ${GRID.ny}`}
-      className="absolute inset-0 size-full touch-none"
+      className={cn("absolute inset-0 size-full touch-none", editor.placing && "cursor-crosshair")}
       onPointerMove={onMove}
       onPointerUp={() => (drag.current = null)}
       onPointerCancel={() => (drag.current = null)}
       onPointerDown={(event) => {
-        if (event.target === event.currentTarget) editor.onSelect(null);
+        if (event.target !== event.currentTarget) return;
+        if (editor.placing) editor.onPlaceAt(toCell(event));
+        else editor.onSelect(null);
       }}
     >
       {layout.furniture.map((f) => {
