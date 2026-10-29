@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// 유동 계산이 무거워 여러 테스트를 병렬로 돌리면 기본 제한(30초)을 넘길 수 있다.
+test.setTimeout(120_000);
+
 test("가구는 서로 겹치지 않고, 가구를 추가하면 유동 결과가 갱신된다", async ({ page }) => {
   await page.goto("/");
   const residual = page.getByTestId("residual");

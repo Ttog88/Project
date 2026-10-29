@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +16,10 @@ import {
   type WindowOpenness,
 } from "@/lib/floorplan";
 
-const COMPASS = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
+import { directionName } from "./compass";
+import { WindCompass } from "./WindCompass";
 
-export function directionName(deg: number): string {
-  return COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
-}
+export { directionName };
 
 export function WindowControls({
   layout,
@@ -82,6 +81,7 @@ export function WindControls({
         <CardDescription>풍향은 바람이 불어오는 방향입니다(0°=북, 90°=동).</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <WindCompass direction={direction} />
         <label className="flex flex-col gap-1.5 text-sm" htmlFor="wind-direction">
           <span className="flex justify-between font-medium">
             풍향
@@ -131,6 +131,7 @@ export function FurniturePanel({
   pendingKind,
   onPendingKind,
   onAddInEmptySpace,
+  onDelete,
 }: {
   layout: Layout;
   selectedId: string | null;
@@ -140,6 +141,8 @@ export function FurniturePanel({
   pendingKind: FurnitureKind | null;
   onPendingKind: (kind: FurnitureKind | null) => void;
   onAddInEmptySpace: () => void;
+  /** 선택한 가구 삭제(확인·되돌리기 없음) */
+  onDelete: (id: string) => void;
 }) {
   const selected = layout.furniture.find((f) => f.id === selectedId) ?? null;
   const meters = (cells: number) => (cells / 6).toFixed(1);
@@ -237,6 +240,16 @@ export function FurniturePanel({
                 <ArrowRight />
               </Button>
             </div>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="self-start"
+              aria-label="선택한 가구 삭제"
+              onClick={() => onDelete(selected.id)}
+            >
+              <Trash2 data-icon="inline-start" />
+              삭제
+            </Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">가구를 선택하면 크기와 위치를 바꿀 수 있습니다.</p>

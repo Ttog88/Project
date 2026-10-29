@@ -6,11 +6,13 @@ export {
   addFurniture,
   checkPlacement,
   placeFurniture,
+  removeFurniture,
   type AddFurnitureResult,
   type FurnitureKind,
   type PlacementCheck,
   type PlacementReason,
   type PlacementResult,
+  type RemoveFurnitureResult,
 } from "./furniture";
 export { rasterize } from "./rasterize";
 export type { Cell, RasterPlan, RasterOpening } from "./rasterize";

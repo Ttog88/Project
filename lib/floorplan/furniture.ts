@@ -127,6 +127,21 @@ export function placeFurniture(layout: Layout, id: string, next: Rect): Placemen
   return { layout: { ...layout, furniture }, status: "moved" };
 }
 
+export type RemoveFurnitureResult =
+  | { layout: Layout; status: "removed"; removed: Furniture }
+  | { layout: Layout; status: "unchanged" };
+
+/** 가구를 삭제한다. 없는 ID면 배치를 그대로 돌려준다. 삭제하면 그 자리의 고체 영역도 사라진다. */
+export function removeFurniture(layout: Layout, id: string): RemoveFurnitureResult {
+  const removed = layout.furniture.find((f) => f.id === id);
+  if (!removed) return { layout, status: "unchanged" };
+  return {
+    layout: { ...layout, furniture: layout.furniture.filter((f) => f.id !== id) },
+    status: "removed",
+    removed,
+  };
+}
+
 export type AddFurnitureResult =
   | { layout: Layout; status: "added"; furniture: Furniture }
   | { layout: Layout; status: "rejected"; reason: PlacementReason | "nospace" };

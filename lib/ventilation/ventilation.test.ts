@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import { addFurniture, createSampleLayout, placeFurniture } from "@/lib/floorplan";
+import { addFurniture, createSampleLayout, placeFurniture, removeFurniture } from "@/lib/floorplan";
 import {
   MEANINGFUL_DIFFERENCE,
   searchWindowCombinations,
   simulateVentilation,
+  windFromVector,
   windPressure,
+  windTravelVector,
   type Conditions,
 } from "@/lib/ventilation";
 
@@ -140,6 +142,89 @@ describe("가구 추가와 유동 계산", () => {
     expect(maskDiff).toBe(6 * 12);
     expect(after.residual).not.toBeCloseTo(before.residual, 4);
     // 추가된 가구 위에는 유동이 없다.
+    for (let c = 0; c < after.field.solid.length; c++) {
+      if (after.field.solid[c]) {
+        expect(after.field.u[c]).toBe(0);
+        expect(after.field.v[c]).toBe(0);
+      }
+    }
+  });
+});
+
+describe("풍향 기준(바람이 불어오는 방향)", () => {
+  test("풍향 0·90·180·270°는 북·동·남·서쪽에서 불어오는 벡터이다", () => {
+    const expected = [
+      [0, 0, 1],
+      [90, 1, 0],
+      [180, 0, -1],
+      [270, -1, 0],
+    ] as const;
+    for (const [deg, east, north] of expected) {
+      const from = windFromVector(deg);
+      expect(from.east).toBeCloseTo(east, 9);
+      expect(from.north).toBeCloseTo(north, 9);
+    }
+  });
+
+  test("공기가 이동하는 방향은 바람이 오는 쪽의 정반대이다", () => {
+    for (const deg of [0, 45, 90, 135, 180, 225, 270, 315]) {
+      const from = windFromVector(deg);
+      const travel = windTravelVector(deg);
+      expect(travel.east).toBeCloseTo(-from.east, 9);
+      expect(travel.north).toBeCloseTo(-from.north, 9);
+    }
+  });
+
+  test("풍압은 같은 기준 벡터에서 나온다(바람을 정면으로 받는 벽의 창이 가장 높다)", () => {
+    const west = { east: -1, north: 0 };
+    const south = { east: 0, north: -1 };
+    for (const deg of [0, 90, 180, 270, 45, 200]) {
+      const from = windFromVector(deg);
+      const dot = (n: { east: number; north: number }) => from.east * n.east + from.north * n.north;
+      const expected = (n: { east: number; north: number }) => (dot(n) > 0 ? dot(n) : 0.5 * dot(n));
+      expect(windPressure(deg, west)).toBeCloseTo(expected(west), 9);
+      expect(windPressure(deg, south)).toBeCloseTo(expected(south), 9);
+    }
+  });
+
+  test("풍향 0·90·180·270°에서 계산이 정하는 유입 창이 화면 기준(바람이 오는 쪽)과 일치한다", () => {
+    const layout = createSampleLayout();
+    // 창 A는 서쪽 외벽, 창 B는 남쪽 외벽. 바람을 더 정면으로 받는 쪽이 유입 창이다.
+    const expectedInlet = { 0: "A", 90: "B", 180: "B", 270: "A" } as const;
+    for (const deg of [0, 90, 180, 270] as const) {
+      const r = simulateVentilation(layout, { ...westWind(1, 1), windDirectionDeg: deg });
+      expect(r.flow.inletId, `풍향 ${deg}°`).toBe(expectedInlet[deg]);
+    }
+    // 270°(서쪽에서 불어옴)는 서쪽 창으로 들어온다.
+    expect(windFromVector(270).east).toBeLessThan(0);
+  });
+
+  test("기존 검증 결과가 그대로이다(서풍 3 m/s, 창 A·B 개방률 조합)", () => {
+    const layout = createSampleLayout();
+    const golden: [0 | 0.5 | 1, 0 | 0.5 | 1, number][] = [
+      [1, 1, 0.19339],
+      [1, 0.5, 0.28123],
+      [0.5, 1, 0.36921],
+      [0.5, 0.5, 0.42236],
+      [0, 1, 1],
+    ];
+    for (const [a, b, residual] of golden) {
+      expect(simulateVentilation(layout, westWind(a, b)).residual).toBeCloseTo(residual, 4);
+    }
+  });
+});
+
+describe("가구 삭제와 유동 계산", () => {
+  test("가구를 삭제하면 고체 셀 마스크와 유동 결과가 달라진다", () => {
+    const layout = createSampleLayout();
+    const table = layout.furniture.find((f) => f.id === "table")!;
+    const removed = removeFurniture(layout, "table").layout;
+    const before = simulateVentilation(layout, westWind(1, 0.5));
+    const after = simulateVentilation(removed, westWind(1, 0.5));
+    const maskDiff = before.field.solid.reduce((n, v, c) => n + (v !== after.field.solid[c] ? 1 : 0), 0);
+    expect(maskDiff).toBe(table.w * table.h);
+    expect(after.residual).not.toBeCloseTo(before.residual, 4);
+    // 삭제한 자리는 유체 영역이 되어 유동이 생길 수 있고, 남은 고체 위에는 여전히 유동이 없다.
     for (let c = 0; c < after.field.solid.length; c++) {
       if (after.field.solid[c]) {
         expect(after.field.u[c]).toBe(0);

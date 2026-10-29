@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// 유동 계산이 무거워 여러 테스트를 병렬로 돌리면 기본 제한(30초)을 넘길 수 있다.
+test.setTimeout(120_000);
+
 test("가구와 창문을 바꾸고 자동 탐색해 추천 조건을 현재 조건과 비교한다", async ({ page }) => {
   await page.goto("/");
   const residual = page.getByTestId("residual");
@@ -26,5 +29,7 @@ test("가구와 창문을 바꾸고 자동 탐색해 추천 조건을 현재 조
   await expect(page.getByTestId("search-results")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId("row-current")).toBeVisible();
   for (const rank of [1, 2, 3]) await expect(page.getByTestId(`row-top-${rank}`)).toBeVisible();
-  await expect(page.getByTestId("comparison").getByRole("img")).toHaveCount(2);
+  // 나란히 비교하는 평면도는 2개이고, 각각 북쪽 화살표가 있다.
+  await expect(page.getByTestId("comparison").locator("canvas")).toHaveCount(2);
+  await expect(page.getByTestId("comparison").getByTestId("north-arrow")).toHaveCount(2);
 });

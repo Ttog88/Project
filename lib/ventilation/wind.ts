@@ -12,10 +12,26 @@ export type WindConditions = {
 const DISCHARGE_COEFFICIENT = 0.6;
 const LEEWARD_SUCTION = 0.5;
 
-/** 창이 바람을 얼마나 정면으로 받는지(풍압계수 비슷한 값). 정면=1, 측면=0, 풍하측은 음수. */
-export function windPressure(deg: number, outwardNormal: { east: number; north: number }): number {
+export type CompassVector = { east: number; north: number };
+
+/**
+ * 풍향(바람이 불어오는 방향, 0=북·90=동·180=남·270=서)을 "바람이 오는 쪽"을 가리키는 단위 벡터로 바꾼다.
+ * 계산(windPressure)과 화면(나침반)이 풍향을 같은 기준으로 읽도록 이 함수 하나만 쓴다.
+ */
+export function windFromVector(deg: number): CompassVector {
   const rad = (deg * Math.PI) / 180;
-  const from = { east: Math.sin(rad), north: Math.cos(rad) };
+  return { east: Math.sin(rad), north: Math.cos(rad) };
+}
+
+/** 공기가 실제로 이동하는 방향의 단위 벡터. 바람이 오는 쪽의 반대이다. */
+export function windTravelVector(deg: number): CompassVector {
+  const from = windFromVector(deg);
+  return { east: -from.east, north: -from.north };
+}
+
+/** 창이 바람을 얼마나 정면으로 받는지(풍압계수 비슷한 값). 정면=1, 측면=0, 풍하측은 음수. */
+export function windPressure(deg: number, outwardNormal: CompassVector): number {
+  const from = windFromVector(deg);
   const c = from.east * outwardNormal.east + from.north * outwardNormal.north;
   return c > 0 ? c : LEEWARD_SUCTION * c;
 }

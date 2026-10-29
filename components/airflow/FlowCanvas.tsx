@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ArrowUp } from "lucide-react";
 
 import {
   GRID,
@@ -25,6 +26,8 @@ type EditorProps = {
   /** 새 가구를 놓을 위치를 고르는 중이면 true */
   placing: boolean;
   onPlaceAt: (cell: { x: number; y: number }) => void;
+  /** 선택한 가구 삭제 요청(Delete 키) */
+  onDelete: (id: string) => void;
 };
 
 type Props = {
@@ -272,6 +275,16 @@ export function FlowCanvas(props: Props) {
       {editor ? (
         <FurnitureLayer svgRef={svgRef} layout={layout} editor={editor} />
       ) : null}
+      {/* 평면도의 위쪽이 북쪽이다. */}
+      <div
+        data-testid="north-arrow"
+        role="img"
+        aria-label="북쪽(평면도 위쪽)"
+        className="pointer-events-none absolute top-1.5 right-1.5 flex flex-col items-center rounded-md bg-background/90 px-1.5 py-0.5 text-[10px] leading-tight font-bold ring-1 ring-foreground/20"
+      >
+        <ArrowUp className="size-3.5 text-destructive" aria-hidden />
+        N
+      </div>
     </div>
   );
 }
@@ -317,6 +330,11 @@ function FurnitureLayer({
   const onKey = (event: React.KeyboardEvent, id: string) => {
     const f = layout.furniture.find((item) => item.id === id);
     if (!f) return;
+    if (event.key === "Delete") {
+      event.preventDefault();
+      editor.onDelete(id);
+      return;
+    }
     const step: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0],
       ArrowRight: [1, 0],

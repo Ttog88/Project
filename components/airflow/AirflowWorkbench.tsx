@@ -10,6 +10,7 @@ import {
   addFurniture,
   createSampleLayout,
   placeFurniture,
+  removeFurniture,
   type FurnitureKind,
   type Layout,
   type Rect,
@@ -60,6 +61,15 @@ export function AirflowWorkbench() {
     const result = placeFurniture(layout, id, rect);
     if (result.status === "moved") setLayout(result.layout);
     else if (result.status === "rejected") setNotice(placementMessage(result.reason!, "edit"));
+  };
+
+  // 삭제하면 고체 영역과 목록이 함께 바뀌고 유동이 다시 계산된다. 확인·되돌리기는 없다.
+  const deleteFurniture = (id: string) => {
+    const result = removeFurniture(layout, id);
+    if (result.status !== "removed") return;
+    setLayout(result.layout);
+    setSelectedId(null);
+    setNotice(null);
   };
 
   const addFurnitureOfKind = (at?: { x: number; y: number }) => {
@@ -167,6 +177,7 @@ export function AirflowWorkbench() {
                 onEdit: editFurniture,
                 placing: pendingKind !== null,
                 onPlaceAt: addFurnitureOfKind,
+                onDelete: deleteFurniture,
               }}
             />
             {notice ? (
@@ -238,6 +249,7 @@ export function AirflowWorkbench() {
             pendingKind={pendingKind}
             onPendingKind={setPendingKind}
             onAddInEmptySpace={() => addFurnitureOfKind()}
+            onDelete={deleteFurniture}
           />
         </div>
       </div>

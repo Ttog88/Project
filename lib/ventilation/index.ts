@@ -10,4 +10,11 @@ export {
   type SearchOutcome,
   type VentilationResult,
 } from "./simulate";
-export { windPressure, type FlowSummary, type WindConditions } from "./wind";
+export {
+  windFromVector,
+  windPressure,
+  windTravelVector,
+  type CompassVector,
+  type FlowSummary,
+  type WindConditions,
+} from "./wind";

@@ -7,6 +7,7 @@ import {
   createSampleLayout,
   placeFurniture,
   rasterize,
+  removeFurniture,
   type Layout,
 } from "@/lib/floorplan";
 
@@ -261,5 +262,63 @@ describe("가구 추가", () => {
     expect(find(resized.layout, f.id).w).toBe(8);
     // 겹치는 위치로는 추가된 가구도 갈 수 없다.
     expect(placeFurniture(resized.layout, f.id, { x: 36, y: 18, w: 6, h: 12 }).status).toBe("rejected");
+  });
+});
+
+describe("가구 삭제", () => {
+  test("선택한 가구가 목록에서 사라지고 다른 가구는 그대로이다", () => {
+    const layout = createSampleLayout();
+    const result = removeFurniture(layout, "table");
+    expect(result.status).toBe("removed");
+    if (result.status !== "removed") return;
+    expect(result.removed.id).toBe("table");
+    expect(result.layout.furniture).toHaveLength(layout.furniture.length - 1);
+    expect(result.layout.furniture.some((f) => f.id === "table")).toBe(false);
+    for (const f of layout.furniture.filter((f) => f.id !== "table")) {
+      expect(find(result.layout, f.id)).toEqual(f);
+    }
+    // 원래 배치는 바뀌지 않는다.
+    expect(layout.furniture.some((f) => f.id === "table")).toBe(true);
+  });
+
+  test("삭제하면 그 가구가 차지하던 고체 셀만 비워진다", () => {
+    const layout = createSampleLayout();
+    const table = find(layout, "table");
+    const result = removeFurniture(layout, "table");
+    const before = rasterize(layout, closed).solid;
+    const after = rasterize(result.layout, closed).solid;
+    expect(at(before, table.x + 1, table.y + 1)).toBe(1);
+    expect(at(after, table.x + 1, table.y + 1)).toBe(0);
+    const changed = before.reduce((n, v, c) => n + (v !== after[c] ? 1 : 0), 0);
+    expect(changed).toBe(table.w * table.h);
+  });
+
+  test("없는 ID를 삭제해도 배치는 그대로이다", () => {
+    const layout = createSampleLayout();
+    const result = removeFurniture(layout, "nothing");
+    expect(result.status).toBe("unchanged");
+    expect(result.layout).toBe(layout);
+  });
+
+  test("삭제로 비워진 자리에는 다른 가구가 놓일 수 있고, 남은 가구의 충돌 규칙은 유지된다", () => {
+    const layout = createSampleLayout();
+    // 소파가 있을 때는 식탁이 소파 자리로 갈 수 없다.
+    expect(placeFurniture(layout, "table", { x: 30, y: 6, w: 8, h: 6 }).status).toBe("rejected");
+    const { layout: withoutSofa } = removeFurniture(layout, "sofa");
+    expect(placeFurniture(withoutSofa, "table", { x: 30, y: 6, w: 8, h: 6 }).status).toBe("moved");
+    // 다른 가구(수납장)와의 겹침은 여전히 거부된다.
+    expect(placeFurniture(withoutSofa, "table", { x: 48, y: 8, w: 8, h: 6 })).toMatchObject({
+      status: "rejected",
+      reason: "furniture",
+    });
+  });
+
+  test("삭제 뒤에도 가구를 추가할 수 있고 ID는 현재 목록 안에서 고유하다", () => {
+    const layout = createSampleLayout();
+    const { layout: after } = removeFurniture(layout, "desk");
+    const added = addFurniture(after, "desk");
+    expect(added.status).toBe("added");
+    const ids = added.layout.furniture.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
