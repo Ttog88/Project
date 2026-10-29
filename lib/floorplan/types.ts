@@ -30,5 +30,6 @@ export type Layout = {
 };
 
 export const OPENNESS_LEVELS = [0, 0.5, 1] as const;
-export type Openness = (typeof OPENNESS_LEVELS)[number];
+/** 창 개방률(0~1). 수동 조절은 5% 단위이고, 자동 탐색은 OPENNESS_LEVELS를 쓴다. */
+export type Openness = number;
 export type WindowOpenness = Record<WindowId, Openness>;

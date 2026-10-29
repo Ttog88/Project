@@ -112,7 +112,7 @@ export async function simulateVentilationAsync(
 export type CombinationEntry = {
   windowOpenness: WindowOpenness;
   result: VentilationResult;
-  /** 잔류율이 낮은 순서의 순위(1부터) */
+  /** 잔류율이 낮은 순서의 순위(1부터). 0이면 탐색 단계에 없어 따로 계산한 현재 조건이다. */
   rank: number;
 };
 
@@ -151,12 +151,17 @@ export async function searchWindowCombinations(
   };
   build(0, {});
 
+  const same = (o: WindowOpenness) => ids.every((id) => o[id] === base.windowOpenness[id]);
+  // 현재 개방률(5% 단위 수동 설정)이 탐색 단계에 없으면 현재 조건을 따로 한 번 더 계산한다.
+  const currentOffGrid = !combos.some(same);
+  const total = combos.length + (currentOffGrid ? 1 : 0);
+
   const results: { windowOpenness: WindowOpenness; result: VentilationResult }[] = [];
   for (const windowOpenness of combos) {
     const result = await simulateVentilationAsync(layout, { ...base, windowOpenness }, options.signal);
     if (!result) return null;
     results.push({ windowOpenness, result });
-    options.onProgress?.(results.length, combos.length);
+    options.onProgress?.(results.length, total);
   }
 
   const openSum = (o: WindowOpenness) => Object.values(o).reduce<number>((s, v) => s + v, 0);
@@ -168,7 +173,12 @@ export async function searchWindowCombinations(
       a.windowOpenness.B - b.windowOpenness.B
   );
   const entries = sorted.map((r, i) => ({ ...r, rank: i + 1 }));
-  const same = (o: WindowOpenness) => ids.every((id) => o[id] === base.windowOpenness[id]);
-  const current = entries.find((e) => same(e.windowOpenness))!;
+  let current = entries.find((e) => same(e.windowOpenness));
+  if (!current) {
+    const result = await simulateVentilationAsync(layout, base, options.signal);
+    if (!result) return null;
+    current = { windowOpenness: base.windowOpenness, result, rank: 0 };
+    options.onProgress?.(total, total);
+  }
   return { entries, top: entries.slice(0, TOP_COUNT), current };
 }

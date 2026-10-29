@@ -1,3 +1,4 @@
+import { openCellsFor } from "./opening";
 import {
   GRID,
   WALL_THICKNESS,
@@ -71,7 +72,7 @@ export function rasterize(layout: Layout, openness: WindowOpenness): RasterPlan 
   for (const f of layout.furniture) fill(solid, f);
 
   const openings: RasterOpening[] = layout.windows.map((def) => {
-    const widthCells = Math.round(def.length * openness[def.id]);
+    const widthCells = openCellsFor(def.length, openness[def.id]);
     const { cells, outerCells } = openingCells(def, widthCells);
     for (const c of cells) solid[c.y * GRID.nx + c.x] = 0;
     return {

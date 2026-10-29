@@ -233,3 +233,72 @@ describe("가구 삭제와 유동 계산", () => {
     }
   });
 });
+
+describe("5% 단위 개방률과 격자 적용", () => {
+  const layout = createSampleLayout();
+  const withOpenness = (a: number, b: number): Conditions => ({
+    windDirectionDeg: 270,
+    windSpeed: 3,
+    windowOpenness: { A: a, B: b },
+  });
+
+  test("같은 열린 칸 수가 되는 설정(10%와 15%)은 계산 결과가 완전히 같다", () => {
+    const a = simulateVentilation(layout, withOpenness(0.1, 1));
+    const b = simulateVentilation(layout, withOpenness(0.15, 1));
+    expect(b.residual).toBe(a.residual);
+    expect(Array.from(b.tracer)).toEqual(Array.from(a.tracer));
+    expect(Array.from(b.field.u)).toEqual(Array.from(a.field.u));
+    expect(b.flow.flux).toBe(a.flow.flux);
+  });
+
+  test("열린 칸 수가 다른 설정은 결과가 달라지고, 더 열수록 잔류율이 낮아진다", () => {
+    const five = simulateVentilation(layout, withOpenness(0.05, 1)).residual;
+    const ten = simulateVentilation(layout, withOpenness(0.1, 1)).residual;
+    const fifty = simulateVentilation(layout, withOpenness(0.5, 1)).residual;
+    expect(ten).not.toBe(five);
+    expect(ten).toBeLessThan(five);
+    expect(fifty).toBeLessThan(ten);
+  });
+
+  test("기존 9개 조합 탐색 결과가 그대로이다(서풍 3 m/s)", async () => {
+    const outcome = await searchWindowCombinations(layout, withOpenness(1, 0.5));
+    const entries = outcome!.entries;
+    expect(entries).toHaveLength(9);
+    expect(outcome!.current.rank).toBe(2);
+    const flowing = entries.slice(0, 4).map((e) => [e.windowOpenness.A, e.windowOpenness.B, e.result.residual]);
+    const golden = [
+      [1, 1, 0.19339],
+      [1, 0.5, 0.28123],
+      [0.5, 1, 0.36921],
+      [0.5, 0.5, 0.42236],
+    ];
+    flowing.forEach(([a, b, r], i) => {
+      expect([a, b]).toEqual([golden[i][0], golden[i][1]]);
+      expect(r).toBeCloseTo(golden[i][2], 4);
+    });
+    for (const e of entries.slice(4)) expect(e.result.residual).toBeCloseTo(1, 6);
+  }, 60_000);
+
+  test("현재 개방률이 탐색 단계에 없으면(55%) 현재 조건을 따로 계산해 현재 행으로 쓴다", async () => {
+    const progress: [number, number][] = [];
+    const outcome = await searchWindowCombinations(layout, withOpenness(0.55, 0.5), {
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    expect(outcome).not.toBeNull();
+    // 탐색 조합은 기존 0/50/100%의 9개 그대로이다.
+    expect(outcome!.entries).toHaveLength(9);
+    for (const e of outcome!.entries) {
+      expect([0, 0.5, 1]).toContain(e.windowOpenness.A);
+      expect([0, 0.5, 1]).toContain(e.windowOpenness.B);
+    }
+    const { current } = outcome!;
+    expect(current.rank).toBe(0);
+    expect(current.windowOpenness).toEqual({ A: 0.55, B: 0.5 });
+    expect(current.result.residual).toBe(simulateVentilation(layout, withOpenness(0.55, 0.5)).residual);
+    expect(outcome!.entries.some((e) => e.rank === current.rank)).toBe(false);
+    expect(progress.at(-1)).toEqual([10, 10]);
+    // 추천은 탐색한 조합 안에서만 고른다.
+    expect(outcome!.top).toHaveLength(3);
+    expect(outcome!.top[0].windowOpenness).toEqual({ A: 1, B: 1 });
+  }, 90_000);
+});

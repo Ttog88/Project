@@ -9,6 +9,8 @@ import {
   FURNITURE_MAX,
   FURNITURE_MIN,
   OPENNESS_LEVELS,
+  OPENNESS_STEP_PERCENT,
+  describeOpening,
   type FurnitureKind,
   type Layout,
   type Openness,
@@ -20,6 +22,13 @@ import { directionName } from "./compass";
 import { WindCompass } from "./WindCompass";
 
 export { directionName };
+
+/** 창 개방률(%) 슬라이더 값을 5% 단위로 맞춰 0~1로 바꾼다. */
+function percentToOpenness(value: number): number {
+  const step = OPENNESS_STEP_PERCENT;
+  const snapped = Math.min(100, Math.max(0, Math.round(value / step) * step));
+  return snapped / 100;
+}
 
 export function WindowControls({
   layout,
@@ -34,30 +43,67 @@ export function WindowControls({
     <Card>
       <CardHeader>
         <CardTitle>창문 개방률</CardTitle>
-        <CardDescription>창은 서로 다른 외벽에 있는 벽 개구부입니다.</CardDescription>
+        <CardDescription>
+          창은 서로 다른 외벽에 있는 벽 개구부입니다. 0~100%를 5% 단위로 조절합니다.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {layout.windows.map((win) => (
-          <div key={win.id} className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">
-              창 {win.id} · {win.label}
-            </span>
-            <div className="flex gap-1.5" role="group" aria-label={`창 ${win.id} 개방률`}>
-              {OPENNESS_LEVELS.map((level) => (
-                <Button
-                  key={level}
-                  size="sm"
-                  className="flex-1"
-                  variant={openness[win.id] === level ? "default" : "outline"}
-                  aria-pressed={openness[win.id] === level}
-                  onClick={() => onChange({ ...openness, [win.id]: level as Openness })}
-                >
-                  {Math.round(level * 100)}%
-                </Button>
-              ))}
+      <CardContent className="flex flex-col gap-4">
+        {layout.windows.map((win) => {
+          const applied = describeOpening(win.length, openness[win.id]);
+          const closed = applied.openCells === 0;
+          return (
+            <div key={win.id} className="flex flex-col gap-1.5" data-testid={`window-${win.id}`}>
+              <span className="text-sm font-medium">
+                창 {win.id} · {win.label}
+              </span>
+              <div className="flex gap-1.5" role="group" aria-label={`창 ${win.id} 개방률`}>
+                {OPENNESS_LEVELS.map((level) => (
+                  <Button
+                    key={level}
+                    size="sm"
+                    className="flex-1"
+                    variant={openness[win.id] === level ? "default" : "outline"}
+                    aria-pressed={openness[win.id] === level}
+                    onClick={() => onChange({ ...openness, [win.id]: level as Openness })}
+                  >
+                    {Math.round(level * 100)}%
+                  </Button>
+                ))}
+              </div>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span className="flex justify-between">
+                  세밀 조절(5% 단위)
+                  <span className="tabular-nums">{applied.settingPercent}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={OPENNESS_STEP_PERCENT}
+                  value={applied.settingPercent}
+                  aria-label={`창 ${win.id} 개방률 세밀 조절(5% 단위)`}
+                  onChange={(event) =>
+                    onChange({ ...openness, [win.id]: percentToOpenness(Number(event.target.value)) })
+                  }
+                  className="w-full accent-primary"
+                />
+              </label>
+              <p className="text-xs tabular-nums" data-testid={`window-${win.id}-applied`}>
+                설정 {applied.settingPercent}% → 적용 {applied.appliedPercent}%
+                {closed
+                  ? "(닫힘)"
+                  : ` (${applied.openCells}/${applied.lengthCells}칸, ${applied.widthMeters.toFixed(1)} m)`}
+              </p>
+              {applied.sameSettings ? (
+                <p className="text-xs text-muted-foreground" data-testid={`window-${win.id}-same`}>
+                  {closed
+                    ? `이 창에서는 ${applied.sameSettings.fromPercent}~${applied.sameSettings.toPercent}%가 모두 닫힘(0칸)으로 계산됩니다.`
+                    : `이 창에서는 ${applied.sameSettings.fromPercent}~${applied.sameSettings.toPercent}%가 같은 열린 폭(${applied.openCells}칸)으로 계산됩니다.`}
+                </p>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );

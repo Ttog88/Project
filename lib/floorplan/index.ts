@@ -14,6 +14,12 @@ export {
   type PlacementResult,
   type RemoveFurnitureResult,
 } from "./furniture";
+export {
+  OPENNESS_STEP_PERCENT,
+  describeOpening,
+  openCellsFor,
+  type AppliedOpening,
+} from "./opening";
 export { rasterize } from "./rasterize";
 export type { Cell, RasterPlan, RasterOpening } from "./rasterize";
 export {
